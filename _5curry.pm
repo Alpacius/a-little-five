@@ -22,7 +22,7 @@ sub makecurry {
     my $rawname = $cv->GV->NAME;
     my ($fname, $pkg) = ($rawname .'_5c', caller);
     my $success = 1;
-    if (*$fname{CODE}) {
+    if (*{$pkg."::$fname"}{CODE}) {
         $success = 0;
     } else {
         *{$pkg."::$fname"} = curry(\&curry, $f);
