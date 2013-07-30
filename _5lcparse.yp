@@ -1,0 +1,43 @@
+%{
+    my %expr_root = ( "kind" => "list", "defn" => [], "term" => [] );
+    sub getrootref { \%expr_root }
+%}
+
+%token VAR
+%token DOT
+%token LPAREN
+%token RPAREN
+%token LAMBDA
+%token EQ
+%token SEMICOLON
+
+%%
+
+list: formlist
+;
+
+formlist: 
+| form formlist
+;
+
+form: term SEMICOLON { my $term = { "kind" => "term", "body" => $_[1] }; push $expr_root{"term"}, $term; $term }
+| VAR EQ term SEMICOLON { my $defn = { "kind" => "defn", "name" => $_[1], "body" => $_[3] }; push $expr_root{"defn"}, $defn; $defn }
+;
+
+term: appterm { my $term = { "kind" => "appl", "body" => $_[1] }; $term }
+| LAMBDA varlist DOT term { my $term = { "kind" => "abst", "para" => $_[2], "body" => $_[4] }; $term }
+;
+
+varlist: { [] }
+| VAR varlist { my $sublist = $_[2]; my @list = ( $_[1], @$sublist ); \@list }
+;
+
+appterm: { [] }
+| aterm appterm { my $sublist = $_[2]; my @list = ( $_[1], @$sublist ); \@list }
+;
+
+aterm: LPAREN term RPAREN { my $term = { "kind" => "applterm", "body" => $_[2] }; $term }
+| VAR { my $term = { "kind" => "applvar", "val" => $_[1] }; $term }
+;
+
+%%
