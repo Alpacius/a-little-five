@@ -20,7 +20,6 @@ sub makecurry {
     my $f = shift;
     my $cv = svref_2object($f);
     my $rawname = $cv->GV->NAME;
-    #my $fname = *$rawname{PACKAGE} .'::'. $rawname .'_5c';
     my ($fname, $pkg) = ($rawname .'_5c', caller);
     my $success = 1;
     if (*$fname{CODE}) {
