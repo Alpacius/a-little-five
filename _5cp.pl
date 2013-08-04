@@ -50,7 +50,12 @@ sub {
 our $literal = 
 sub {
     my $y = $_[0];
-    $satisfy->( sub { print "literal $y against $_[0] - "; $y eq $_[0] } )
+    $satisfy->( 
+        sub { 
+            #print "literal $y against $_[0] - "; 
+            $y eq $_[0] 
+        } 
+    )
 };
 
 our $alt = 
@@ -174,7 +179,7 @@ defer {
 $factor =
 defer {
     $alt->(
-        $using->(number(), sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } print $val, "\n"; [ $val ] } ),
+        $using->(number(), sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } [ $val ] } ),
         $using->($then->($literal->('('), $then->($expn, $literal->(')'))), sub { my $l = $_[0]; [ $l->[1] ] } )
     )
 };
