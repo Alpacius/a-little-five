@@ -157,9 +157,9 @@ my ($expn, $term, $factor);
 $expn = 
 defer {
     $alt->(
-        $using->($then->($term, $then->($literal->('+'), $term)), \&do_add),
+        $using->($then->($term, $then->($literal->('+'), $expn)), \&do_add),
         $alt->(
-            $using->($then->($term, $then->($literal->('-'), $term)), \&do_sub),
+            $using->($then->($term, $then->($literal->('-'), $expn)), \&do_sub),
             $term
         )
     )
@@ -168,9 +168,9 @@ defer {
 $term =
 defer {
     $alt->(
-        $using->($then->($factor, $then->($literal->('*'), $factor)), \&do_mul),
+        $using->($then->($factor, $then->($literal->('*'), $term)), \&do_mul),
         $alt->(
-            $using->($then->($factor, $then->($literal->('/'), $factor)), \&do_div),
+            $using->($then->($factor, $then->($literal->('/'), $term)), \&do_div),
             $factor
         )
     )
@@ -214,4 +214,5 @@ sub number {
 }
 
 # a simple test
-print $expn->('(2+(4-1)*3)+1')->[0]->[0]->[0], "\n";
+print $expn->('2+(4-1)*3+4-2')->[0]->[0]->[0], "\n";
+print $expn->('1+2+3-2*2')->[0]->[0]->[0], "\n";
