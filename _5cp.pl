@@ -33,12 +33,12 @@ sub {
     my $p = $_[0];
     sub {
         if (my ($x, $xs) = ($_[0] =~ /(.)(.*)/s) ) {
-            print "x=$x, xs=$xs\n";
+            #print "x=$x, xs=$xs\n";
             if ($p->($x)) {
-                print "success $x\n";
+                #print "success $x\n";
                 return $succeed->($x)->($xs);
             } else {
-                print "fail $x\n";
+                #print "fail $x\n";
                 return $fail->($xs);
             }
         } else {
@@ -107,7 +107,7 @@ sub {
     sub {
         my $inp = $_[0];
         my $reslist = $p->($inp);
-        print "using: ".@$reslist." results\n";
+        #print "using: ".@$reslist." results\n";
         my $finlist = [];
         for my $respair (@$reslist) {
             push @$finlist, [ $f->($respair->[0]), $respair->[1] ];
@@ -184,7 +184,7 @@ $term = force $term;
 $factor = force $factor;
 
 sub number {
-    print "number\n";
+    #print "number\n";
     $many->(
         $alt->($literal->('0'), 
                $alt->($literal->('1'),
