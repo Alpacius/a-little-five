@@ -125,6 +125,7 @@ our $many = \&many_s;
 sub expn;
 sub term;
 sub factor;
+sub number;
 
 sub do_add {
     my $l = $_[0];
