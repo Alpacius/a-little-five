@@ -1,7 +1,14 @@
 #!/usr/bin/env perl
 
 use strict;
-use Scalar::Defer;
+
+sub descalar {
+    if (ref($_[0]) eq "REF") {
+        return ${$_[0]};
+    } else {
+        return $_[0];
+    }
+}
 
 our $concat =
 sub {
@@ -60,8 +67,9 @@ sub {
 
 our $alt = 
 sub {
-    my ($p1, $p2) = @_;
+    my ($p1_, $p2_) = @_;
     sub {
+        my ($p1, $p2) = (descalar($p1_), descalar($p2_));
         my $inp = $_[0];
         $concat->($p1->($inp), $p2->($inp))
     }
@@ -69,8 +77,9 @@ sub {
 
 our $then = 
 sub {
-    my ($p1, $p2) = @_;
+    my ($p1_, $p2_) = @_;
     sub {
+        my ($p1, $p2) = (descalar($p1_), descalar($p2_));
         my $inp = $_[0];
         my $reslist1 = $p1->($inp);
         my $finlist = [];
@@ -87,6 +96,7 @@ sub {
 };
 
 # XXX wow 'tis ugly
+# XXX This combinator is only used by many. You know what to do.
 my $then_lazy =
 sub {
     my ($p1, $p2) = @_;
@@ -108,8 +118,9 @@ sub {
 
 our $using =
 sub {
-    my ($p, $f) = @_;
+    my ($p_, $f) = @_;
     sub {
+        my $p = descalar($p_);
         my $inp = $_[0];
         my $reslist = $p->($inp);
         #print "using: ".@$reslist." results\n";
@@ -155,38 +166,28 @@ sub do_div {
 my ($expn, $term, $factor);
 
 $expn = 
-defer {
     $alt->(
-        $using->($then->($term, $then->($literal->('+'), $expn)), \&do_add),
+        $using->($then->(\$term, $then->($literal->('+'), \$expn)), \&do_add),
         $alt->(
-            $using->($then->($term, $then->($literal->('-'), $expn)), \&do_sub),
-            $term
+            $using->($then->(\$term, $then->($literal->('-'), \$expn)), \&do_sub),
+            \$term
         )
-    )
-};
+    );
 
 $term =
-defer {
     $alt->(
-        $using->($then->($factor, $then->($literal->('*'), $term)), \&do_mul),
+        $using->($then->(\$factor, $then->($literal->('*'), \$term)), \&do_mul),
         $alt->(
-            $using->($then->($factor, $then->($literal->('/'), $term)), \&do_div),
-            $factor
+            $using->($then->(\$factor, $then->($literal->('/'), \$term)), \&do_div),
+            \$factor
         )
-    )
-};
+    );
 
 $factor =
-defer {
     $alt->(
         $using->(number(), sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } [ $val ] } ),
-        $using->($then->($literal->('('), $then->($expn, $literal->(')'))), sub { my $l = $_[0]; [ $l->[1] ] } )
-    )
-};
-
-$expn = force $expn;
-$term = force $term;
-$factor = force $factor;
+        $using->($then->($literal->('('), $then->(\$expn, $literal->(')'))), sub { my $l = $_[0]; [ $l->[1] ] } )
+    );
 
 sub number {
     #print "number\n";
