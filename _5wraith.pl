@@ -40,12 +40,9 @@ sub {
     my $p = $_[0];
     sub {
         if (my ($x, $xs) = ($_[0] =~ /(.)(.*)/s) ) {
-            #print "x=$x, xs=$xs\n";
             if ($p->($x)) {
-                #print "success $x\n";
                 return $succeed->($x)->($xs);
             } else {
-                #print "fail $x\n";
                 return $fail->($xs);
             }
         } else {
@@ -59,7 +56,6 @@ sub {
     my $y = $_[0];
     $satisfy->( 
         sub { 
-            #print "literal $y against $_[0] - "; 
             $y eq $_[0] 
         } 
     )
@@ -123,7 +119,6 @@ sub {
         my $p = descalar($p_);
         my $inp = $_[0];
         my $reslist = $p->($inp);
-        #print "using: ".@$reslist." results\n";
         my $finlist = [];
         for my $respair (@$reslist) {
             push @$finlist, [ $f->($respair->[0]), $respair->[1] ];
@@ -190,7 +185,6 @@ $factor =
     );
 
 sub number {
-    #print "number\n";
     $many->(
         $alt->($literal->('0'), 
                $alt->($literal->('1'),
