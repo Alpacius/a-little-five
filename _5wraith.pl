@@ -56,7 +56,6 @@ sub {
     my $y = $_[0];
     $satisfy->( 
         sub { 
-            #print "literal $y against $_[0] - "; 
             $y eq $_[0] 
         } 
     )
@@ -143,6 +142,8 @@ sub many_s {
     $alt->($then_lazy->($p, sub { many_s($p) }), $succeed->( [] ))
 }
 our $many = \&many_s;
+
+# test syntax & semantic actions
 
 sub do_add {
     my $l = $_[0];
