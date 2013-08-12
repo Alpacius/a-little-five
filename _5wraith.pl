@@ -56,8 +56,19 @@ sub {
     my $y = $_[0];
     $satisfy->( 
         sub { 
+            #print "literal $y against $_[0] - "; 
             $y eq $_[0] 
         } 
+    )
+};
+
+our $literals = 
+sub {
+    my $y = $_[0];
+    $satisfy->(
+        sub {
+            index($y, $_[0]) != -1
+        }
     )
 };
 
@@ -133,11 +144,6 @@ sub many_s {
 }
 our $many = \&many_s;
 
-sub expn;
-sub term;
-sub factor;
-sub number;
-
 sub do_add {
     my $l = $_[0];
     [ $l->[0] + $l->[2] ]
@@ -155,6 +161,10 @@ sub do_mul {
 
 sub do_div {
     my $l = $_[0];
+    # XXX Beware of bad matching
+    if ($l->[2] == 0) {
+        $l->[2] = 1;
+    }
     [ $l->[0] / $l->[2] ]
 }
 
@@ -184,30 +194,11 @@ $factor =
         $using->($then->($literal->('('), $then->(\$expn, $literal->(')'))), sub { my $l = $_[0]; [ $l->[1] ] } )
     );
 
+
 sub number {
-    $many->(
-        $alt->($literal->('0'), 
-               $alt->($literal->('1'),
-                      $alt->($literal->('2'),
-                             $alt->($literal->('3'),
-                                    $alt->($literal->('4'),
-                                           $alt->($literal->('5'),
-                                                  $alt->($literal->('6'),
-                                                         $alt->($literal->('7'),
-                                                                $alt->($literal->('8'),
-                                                                       $literal->('9')
-                                                                      )
-                                                               )
-                                                        )
-                                                 )
-                                          )
-                                   )
-                            )
-                     )
-              )
-    )
+    $many->($literals->('0123456789'))
 }
 
-# a simple test
+# simple tests
 print $expn->('2+(4-1)*3+4-2')->[0]->[0]->[0], "\n";
-print $expn->('1+2+3-2*2')->[0]->[0]->[0], "\n";
+print $expn->('1+2+3-2*7/2')->[0]->[0]->[0], "\n";
