@@ -207,6 +207,8 @@ $term = ( (\$factor >> $wraith::token->('\*') >> \$term) ** sub { [ $_[0]->[0] *
 $factor = ( (\$num) ** sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } [ $val ] } ) |
           ( ( $wraith::token->('\(') >> \$expn >> $wraith::token->('\)') ) ** sub { my $l = $_[0]; [ $l->[1] ] } );
 
+# both defns are available
+
 $num = $wraith::token->('[1-9][0-9]*');
 #$num = $wraith::literals->('123456789') >> $wraith::many->($wraith::literals->('0123456789'));
 
