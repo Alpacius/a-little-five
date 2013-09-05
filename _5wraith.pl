@@ -65,10 +65,11 @@ use strict;
     our $satisfy = 
     bless
     sub {
-        my $p = $_[0];
+        my ($p, $m) = @_;
+        $m = sub { $_[0] =~ /(.)(.*)/s } if not $m;
         bless
         sub {
-            if (my ($x, $xs) = ($_[0] =~ /(.)(.*)/s) ) {
+            if (my ($x, $xs) = $m->($_[0])) {
                 if ($p->($x)) {
                     return $succeed->($x)->($xs);
                 } else {
@@ -87,7 +88,7 @@ use strict;
         $satisfy->( 
             sub { 
                 $y eq $_[0] 
-            } 
+            }
         )
     };
 
@@ -98,6 +99,19 @@ use strict;
         $satisfy->(
             sub {
                 index($y, $_[0]) != -1
+            }
+        )
+    };
+
+    our $token =
+    bless 
+    sub {
+        my ($tok, $skip) = @_;
+        $skip = '\s*' if not $skip;
+        $satisfy->(
+            sub { 1 },
+            sub {
+                $_[0] =~ /^$skip($tok)(.*)/s
             }
         )
     };
@@ -176,45 +190,25 @@ use strict;
     }
 }
 
-sub do_add {
-    my $l = $_[0];
-    [ $l->[0] + $l->[2] ]
-}
-
-sub do_sub {
-    my $l = $_[0];
-    [ $l->[0] - $l->[2] ]
-}
-
-sub do_mul {
-    my $l = $_[0];
-    [ $l->[0] * $l->[2] ]
-}
-
-sub do_div {
-    my $l = $_[0];
-    if ($l->[2] == 0) {
-        return [];
-    } else {
-        return [ $l->[0] / $l->[2] ];
-    }
-}
+# test case: a simple expression calculator
 
 my ($expn, $term, $factor, $num);
 wraith_rule->makerules(\$expn, \$term, \$factor, \$num);
 
-$expn = ( (\$term >> $wraith::literal->('+') >> \$expn) ** \&do_add ) |
-        ( (\$term >> $wraith::literal->('-') >> \$expn) ** \&do_sub ) |
+$expn = ( (\$term >> $wraith::token->('\+') >> \$expn) ** sub { [ $_[0]->[0] + $_[0]->[2] ] } ) |
+        ( (\$term >> $wraith::token->('-') >> \$expn) ** sub { [ $_[0]->[0] - $_[0]->[2] ] } ) |
         ( \$term );
 
-$term = ( (\$factor >> $wraith::literal->('*') >> \$term) ** \&do_mul ) |
-        ( (\$factor >> $wraith::literal->('/') >> \$term) ** \&do_div ) |
+$term = ( (\$factor >> $wraith::token->('\*') >> \$term) ** sub { [ $_[0]->[0] * $_[0]->[2] ] } ) |
+        ( (\$factor >> $wraith::token->('\/') >> \$term) ** 
+            sub { $_[0]->[2] ? [ $_[0]->[0] / $_[0]->[2] ] : [] } ) |
         ( \$factor );
 
 $factor = ( (\$num) ** sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } [ $val ] } ) |
-          ( ( $wraith::literal->('(') >> \$expn >> $wraith::literal->(')') ) ** sub { my $l = $_[0]; [ $l->[1] ] } );
+          ( ( $wraith::token->('\(') >> \$expn >> $wraith::token->('\)') ) ** sub { my $l = $_[0]; [ $l->[1] ] } );
 
-$num = $wraith::literals->('123456789') >> $wraith::many->($wraith::literals->('0123456789'));
+$num = $wraith::token->('[1-9][0-9]*');
+#$num = $wraith::literals->('123456789') >> $wraith::many->($wraith::literals->('0123456789'));
 
-print $expn->('2+(4-1)*3+4-2')->[0]->[0]->[0], "\n";
-print $expn->('1+2+3-2*7/2')->[0]->[0]->[0], "\n";
+print $expn->('2 +  (4 - 1) * 3 +  4 -2')->[0]->[0]->[0], "\n";
+print $expn->('1+2+3-2*7/ 2')->[0]->[0]->[0], "\n";
