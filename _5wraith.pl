@@ -165,9 +165,6 @@ use strict;
     our $using = bless \&using_impl;
 
     sub many_impl {
-        # XXX bug at 10th then (2nd many)
-        # XXX fix by remove dereference
-        #my ($p) = deref($_[0]);
         my $p = $_[0];
         my $f;
         tie $f, "inner_lazy", sub { many_impl($p) };
@@ -202,26 +199,26 @@ my $rootref = \%expr_root;
 my ($formlist, $form, $term, $varlist, $appterm, $aterm);
 wraith_rule->makerules(\$formlist, \$form, \$term, \$varlist, \$appterm, \$aterm);
 
-$formlist = $wraith::many->(\$form); # 1
-$form = ( (\$term >> $wraith::token->(';')) ** # 2
+$formlist = $wraith::many->(\$form); 
+$form = ( (\$term >> $wraith::token->(';')) ** 
             sub { 
                 [ { "kind" => "term", "body" => $_[0]->[0] } ]
             } 
         ) | 
-        ( ($wraith::token->('[A-Za-z_]+') >> $wraith::token->('=') >> \$term >> $wraith::token->(';')) ** # 345
+        ( ($wraith::token->('[A-Za-z_]+') >> $wraith::token->('=') >> \$term >> $wraith::token->(';')) ** 
             sub {
                 [ { "kind" => "defn", "name" => $_[0]->[0], "body" => $_[0]->[2] } ]
             } 
         );
 $term = ( (\$appterm) ** sub { [ { "kind" => "appl", "body" => $_[0]->[0] } ] } ) |
-        ( ($wraith::token->('\\\\') >> \$varlist >> $wraith::token->('\.') >> \$term) ** # 678
+        ( ($wraith::token->('\\\\') >> \$varlist >> $wraith::token->('\.') >> \$term) ** 
             sub {
                 [ { "kind" => "abst", "para" => $_[0]->[1], "body" => $_[0]->[3] } ]
             } 
         );
-$varlist = ($wraith::many->($wraith::token->('[A-Za-z_]+'))) ** sub { [ $_[0] ] }; # 9
-$appterm = ($wraith::many->(\$aterm)) ** sub { [ $_[0] ] }; # 10
-$aterm = ( ($wraith::token->('\(') >> \$term >> $wraith::token->('\)')) **  # 11
+$varlist = ($wraith::many->($wraith::token->('[A-Za-z_]+'))) ** sub { [ $_[0] ] }; 
+$appterm = ($wraith::many->(\$aterm)) ** sub { [ $_[0] ] };
+$aterm = ( ($wraith::token->('\(') >> \$term >> $wraith::token->('\)')) **
             sub { [ { "kind" => "applterm", "body" => $_[0]->[1] } ] } 
          ) |
          ( ($wraith::token->('[A-Za-z_]+')) ** sub { [ { "kind" => "applvar", "val" => $_[0]->[0] } ] } );
