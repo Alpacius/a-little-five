@@ -111,6 +111,7 @@ use strict;
         $satisfy->(
             sub { 1 },
             sub {
+                #print "match: $tok\n";
                 $_[0] =~ /^$skip($tok)(.*)/s
             }
         )
@@ -164,7 +165,10 @@ use strict;
     our $using = bless \&using_impl;
 
     sub many_impl {
-        my ($p) = deref($_[0]);
+        # XXX bug at 10th then (2nd many)
+        # XXX fix by remove dereference
+        #my ($p) = deref($_[0]);
+        my $p = $_[0];
         my $f;
         tie $f, "inner_lazy", sub { many_impl($p) };
         $alt->($then->($p, $f), $succeed->( [] ))
@@ -190,27 +194,131 @@ use strict;
     }
 }
 
-# test case: a simple expression calculator
+# test case: a lambda-calculus-to-perl translator
 
-my ($expn, $term, $factor, $num);
-wraith_rule->makerules(\$expn, \$term, \$factor, \$num);
+my %expr_root = ( "kind" => "list", "defn" => [], "term" => [] );
+my $rootref = \%expr_root;
 
-$expn = ( (\$term >> $wraith::token->('\+') >> \$expn) ** sub { [ $_[0]->[0] + $_[0]->[2] ] } ) |
-        ( (\$term >> $wraith::token->('-') >> \$expn) ** sub { [ $_[0]->[0] - $_[0]->[2] ] } ) |
-        ( \$term );
+my ($formlist, $form, $term, $varlist, $appterm, $aterm);
+wraith_rule->makerules(\$formlist, \$form, \$term, \$varlist, \$appterm, \$aterm);
 
-$term = ( (\$factor >> $wraith::token->('\*') >> \$term) ** sub { [ $_[0]->[0] * $_[0]->[2] ] } ) |
-        ( (\$factor >> $wraith::token->('\/') >> \$term) ** 
-            sub { $_[0]->[2] ? [ $_[0]->[0] / $_[0]->[2] ] : [] } ) |
-        ( \$factor );
+$formlist = $wraith::many->(\$form); # 1
+$form = ( (\$term >> $wraith::token->(';')) ** # 2
+            sub { 
+                [ { "kind" => "term", "body" => $_[0]->[0] } ]
+            } 
+        ) | 
+        ( ($wraith::token->('[A-Za-z_]+') >> $wraith::token->('=') >> \$term >> $wraith::token->(';')) ** # 345
+            sub {
+                [ { "kind" => "defn", "name" => $_[0]->[0], "body" => $_[0]->[2] } ]
+            } 
+        );
+$term = ( (\$appterm) ** sub { [ { "kind" => "appl", "body" => $_[0]->[0] } ] } ) |
+        ( ($wraith::token->('\\\\') >> \$varlist >> $wraith::token->('\.') >> \$term) ** # 678
+            sub {
+                [ { "kind" => "abst", "para" => $_[0]->[1], "body" => $_[0]->[3] } ]
+            } 
+        );
+$varlist = ($wraith::many->($wraith::token->('[A-Za-z_]+'))) ** sub { [ $_[0] ] }; # 9
+$appterm = ($wraith::many->(\$aterm)) ** sub { [ $_[0] ] }; # 10
+$aterm = ( ($wraith::token->('\(') >> \$term >> $wraith::token->('\)')) **  # 11
+            sub { [ { "kind" => "applterm", "body" => $_[0]->[1] } ] } 
+         ) |
+         ( ($wraith::token->('[A-Za-z_]+')) ** sub { [ { "kind" => "applvar", "val" => $_[0]->[0] } ] } );
 
-$factor = ( (\$num) ** sub { my $l = $_[0]; my $val = undef; for my $i (@$l) { $val .= $i; } [ $val ] } ) |
-          ( ( $wraith::token->('\(') >> \$expn >> $wraith::token->('\)') ) ** sub { my $l = $_[0]; [ $l->[1] ] } );
+sub emitabst;
+sub emitappl;
+sub emitapplterm;
+sub emitapplvar;
+sub emitterm;
+sub emitdefn;
 
-# both defns are available
+my %emitmethods = (
+    "term" => \&emitterm,
+    "defn" => \&emitdefn,
+    "appl" => \&emitappl,
+    "abst" => \&emitabst,
+    "applterm" => \&emitapplterm,
+    "applvar" => \&emitapplvar
+);
 
-$num = $wraith::token->('[1-9][0-9]*');
-#$num = $wraith::literals->('123456789') >> $wraith::many->($wraith::literals->('0123456789'));
+sub emitabst {
+    my $abstref = $_[0];
+    my $params = $abstref->{"para"};
+    my $nparams = @$params;
+    my $c_param = shift @$params;
+    my $codefrag = undef;
+    if ($nparams) {
+        $codefrag .= "sub { my \$$c_param = \$_[0]; ";
+    } 
+    if (@$params) {
+        $codefrag .= emitabst($abstref);
+    } else {
+        $codefrag .= $emitmethods{$abstref->{"body"}->{"kind"}}->($abstref->{"body"});
+    }
+    $codefrag.' }'
+}
 
-print $expn->('2 +  (4 - 1) * 3 +  4 -2')->[0]->[0]->[0], "\n";
-print $expn->('1+2+3-2*7/ 2')->[0]->[0]->[0], "\n";
+sub emitappl {
+    my $applref = $_[0];
+    my $oplist = $applref->{"body"};
+    my $codefrag = undef;
+    my $addparen = 0;
+    while (@$oplist) {
+        my $opitr = shift @$oplist;
+        if ($addparen) {
+            $codefrag .= '( ';
+        }
+        $codefrag .= $emitmethods{$opitr->{"kind"}}->($opitr);
+        if ($addparen) {
+            $codefrag .= ' )';
+        }
+        if (@$oplist) {
+            $codefrag .= '->';
+            $addparen = 1;
+        }
+    }
+    $codefrag
+}
+
+sub emitapplterm {
+    my $atermref = $_[0];
+    $emitmethods{$atermref->{"body"}->{"kind"}}->($atermref->{"body"})
+}
+
+sub emitapplvar {
+    my $varref = $_[0];
+    '$'. $varref->{"val"}
+}
+
+sub emitterm {
+    my $termref = $_[0];
+    $emitmethods{$termref->{"body"}->{"kind"}}->($termref->{"body"})
+}
+
+sub emitdefn {
+    my $defnref = $_[0];
+    'my $' . $defnref->{"name"} .' = '. $emitmethods{$defnref->{"body"}->{"kind"}}->($defnref->{"body"}) .';'
+}
+
+my $res = $formlist->('true = \x y.x; x x y; Y = \f.(\x y.f (x x)) (\x y. f (x x));');
+for my $itr (@{$res->[0]->[0]}) {
+    if ($itr->{"kind"} eq "term") {
+        push $expr_root{"term"}, $itr;
+    } else {
+        push $expr_root{"defn"}, $itr;
+    }
+}
+#die;
+
+my ($defnlist, $termlist) = ($rootref->{"defn"}, $rootref->{"term"});
+
+print "# defnlist: \n";
+for my $defnitr (@$defnlist) {
+    print emitdefn($defnitr); print "\n";
+}
+
+print "# termlist: \n";
+for my $termitr (@$termlist) {
+    print emitterm($termitr); print "\n";
+}
