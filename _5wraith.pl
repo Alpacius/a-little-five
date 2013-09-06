@@ -111,7 +111,6 @@ use strict;
         $satisfy->(
             sub { 1 },
             sub {
-                #print "match: $tok\n";
                 $_[0] =~ /^$skip($tok)(.*)/s
             }
         )
@@ -306,7 +305,6 @@ for my $itr (@{$res->[0]->[0]}) {
         push $expr_root{"defn"}, $itr;
     }
 }
-#die;
 
 my ($defnlist, $termlist) = ($rootref->{"defn"}, $rootref->{"term"});
 
