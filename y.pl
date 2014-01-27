@@ -1,11 +1,16 @@
 #!/usr/bin/env perl
 
-sub Y {
+sub Ycbv {
     my $f = shift;
     sub {
         my $x = shift;
-        $f->(Y($f))->($x)
-    }
+        $f->( sub { my $y = shift; $x->($x)->($y) } )
+    }->(
+        sub {
+            my $x = shift;
+            $f->( sub { my $y = shift; $x->($x)->($y) } )
+        }
+    )
 }
 
 sub facbody {
@@ -16,5 +21,5 @@ sub facbody {
     }
 }
 
-my $fac = Y(\&facbody);
-print $fac->(5), "\n";
+my $fac = Ycbv(\&facbody);
+print $fac->(6), "\n";
