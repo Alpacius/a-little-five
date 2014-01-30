@@ -1,0 +1,20 @@
+%token VAR
+%token IMP
+%token FUN
+%token LPAREN
+%token RPAREN
+%token APP
+
+%nonassoc FUN
+%nonassoc VAR LPAREN
+%left APP
+
+%%
+
+expr: VAR { { "kind" => "var", "val" => $_[1] } }
+    | FUN VAR IMP expr { { "kind" => "abst", "val" => [$_[2], $_[4]] } }
+    | LPAREN expr RPAREN { $_[2] }
+    | expr expr %prec APP { { "kind" => "appl", "val" => [$_[1], $_[2]] } }
+;
+
+%%
