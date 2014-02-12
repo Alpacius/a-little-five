@@ -59,7 +59,7 @@ sub type_to_string {
                 for my $elt (@{$type->{"val"}->{"args"}}) {
                     $ret .= type_to_string($elt).' ';
                 }
-                return $ret.' )';
+                return $ret.')';
             }
         }
     );
@@ -179,6 +179,8 @@ my $langenv = {};
 my ($type_var_pairelt1, $type_var_pairelt2) = (new_typevar(), new_typevar());
 my $pair_type = new_typeappl('*', [ $type_var_pairelt1, $type_var_pairelt2 ]);
 $langenv->{"pair"} = new_typeappl("->", [ $type_var_pairelt1, new_typeappl("->", [ $type_var_pairelt2, $pair_type ]) ] );
+$langenv->{"prea"} = new_typeappl("Int", []);
+$langenv->{"preb"} = new_typeappl("Bool", []);
 
 while (my ($k, $v) = each %$langenv) {
     print "$k :: ".type_to_string($v)."\n";
