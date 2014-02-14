@@ -13,6 +13,7 @@ my @tokens = (
         FUN         [\\\\]
         IMP         [.]
         LET         let
+        LETREC      rec
         EQ          [=]
         IN          in
         END         end
@@ -125,7 +126,16 @@ sub unify {
         } 
     };
     my %switches = (
-        "typevar typevar" => $check_and_union->($type1, $type2),
+        #"typevar typevar" => $check_and_union->($type1, $type2),
+        "typevar typevar" => 
+        sub { 
+            if ((scalar grep { occurs_in_type($type1, $_) } @$free_typevars) &&
+               !(scalar grep { occurs_in_type($type2, $_) } @$free_typevars)) {
+               unify($type2, $type1, $free_typevars)
+            } else {
+                $check_and_union->($type1, $type2)->()
+            }
+        },
         "typevar typeappl" => $check_and_union->($type1, $type2),
         "typeappl typevar" => $check_and_union->($type2, $type1),
         "typeappl typeappl" => 
@@ -159,7 +169,9 @@ sub algorithm_w {
             my ($func_type, $arg_type) = 
             (algorithm_w($expr->{"val"}->[0], $env, $free_typevars),
              algorithm_w($expr->{"val"}->[1], $env, $free_typevars));
-            my $ret = new_typevar();
+            my $ret = new_typevar(); 
+            # XXX Here we pollute $free_typevars. $ret should be free.
+            push @$free_typevars, $ret;
             unify(new_typeappl("->", [ $arg_type, $ret ]), $func_type, $free_typevars);
             $ret
         },
@@ -169,6 +181,20 @@ sub algorithm_w {
             my $env_current = { %$env };
             $env_current->{$expr->{"val"}->[0]} = $defn_type;
             algorithm_w($expr->{"val"}->[2], $env_current, $free_typevars)
+        },
+        "letrec" =>
+        sub {
+            my ( $env_current, $free_typevars_current ) = 
+               ( { %$env }, [ @$free_typevars ] );
+            my $defn_vartype = new_typevar();
+            $env_current->{$expr->{"val"}->[0]} = $defn_vartype;
+            push @$free_typevars_current, $defn_vartype;
+            my $defn_type = algorithm_w($expr->{"val"}->[1], $env_current, $free_typevars_current);
+            # XXX Remove $defn_vartype from foralls. Now it's higher-order polymorphism.
+            my($rmidx)= grep { $free_typevars_current->[$_] eq $defn_vartype } 0..$#{$free_typevars_current};
+            splice @$free_typevars_current, $rmidx, 1;
+            unify($defn_vartype, $defn_type, $free_typevars_current);
+            algorithm_w($expr->{"val"}->[2], $env_current, $free_typevars_current)
         }
     );
     $switches{$expr->{"kind"}}->()
