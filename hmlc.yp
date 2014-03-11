@@ -9,6 +9,7 @@
 %token IN
 %token END
 %token APP
+%token COMMA
 
 %nonassoc FUN
 %nonassoc VAR LPAREN
@@ -21,7 +22,20 @@ expr: VAR { { "kind" => "var", "val" => $_[1] } }
     | LPAREN expr RPAREN { $_[2] }
     | expr expr %prec APP { { "kind" => "appl", "val" => [$_[1], $_[2]] } }
     | LET VAR EQ expr IN expr END { { "kind" => "let", "val" => [$_[2], $_[4], $_[6]] } }
-    | LETREC VAR EQ expr IN expr END { { "kind" => "letrec", "val" => [$_[2], $_[4], $_[6]] } }
+    | LETREC defnlist IN expr END { { "kind" => "letrec", "val" => [$_[2], $_[4]] } }
+;
+
+defn: VAR EQ expr { [ $_[1], $_[3] ] }
+;
+
+defnlist: defn defncdr { [ $_[1], @{$_[2]} ] }
+;
+
+defnpost: COMMA defn { $_[2] }
+;
+
+defncdr: { [] }
+       | defnpost defncdr { [ $_[1], @{$_[2]} ] }
 ;
 
 %%

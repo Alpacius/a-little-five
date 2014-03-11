@@ -18,7 +18,8 @@ my @tokens = (
         IN          in
         END         end
         VAR         [A-Za-z_]+
-    )
+    ),
+    COMMA => q/,/
 );
 
 our $lexer = Parse::Lex->new(@tokens);
@@ -55,6 +56,8 @@ sub type_to_string {
         sub {
             if ($#{$type->{"val"}->{"args"}} == 1) {
                 return '('.type_to_string($type->{"val"}->{"args"}->[0]).' '.$type->{"val"}->{"oper"}.' '.type_to_string($type->{"val"}->{"args"}->[1]).')';
+            } elsif ($#{$type->{"val"}->{"args"}} < 0){
+                return $type->{"val"}->{"oper"};
             } else {
                 my $ret = '( '.$type->{"val"}->{"oper"}.' ';
                 for my $elt (@{$type->{"val"}->{"args"}}) {
@@ -140,7 +143,7 @@ sub unify {
         "typeappl typevar" => $check_and_union->($type2, $type1),
         "typeappl typeappl" => 
         sub {
-            die "operator mismatch" if ($type1->{"val"}->{"oper"} ne $type2->{"val"}->{"oper"});
+            die "operator mismatch: $type1->{val}->{oper} - $type2->{val}->{oper}" if ($type1->{"val"}->{"oper"} ne $type2->{"val"}->{"oper"});
             die "arith mismatch" if ($#{$type1->{"val"}->{"args"}} != $#{$type2->{"val"}->{"args"}});
             for (my $idx = 0; $idx <= $#{$type1->{"val"}->{"args"}}; $idx++) {
                 unify($type1->{"val"}->{"args"}->[$idx], $type2->{"val"}->{"args"}->[$idx], $free_typevars);
@@ -171,6 +174,7 @@ sub algorithm_w {
              algorithm_w($expr->{"val"}->[1], $env, $free_typevars));
             my $ret = new_typevar(); 
             # XXX Here we pollute $free_typevars. $ret should be free.
+            #     It does not matter that we pollute the "global" ftv list. We will not keep it.
             push @$free_typevars, $ret;
             unify(new_typeappl("->", [ $arg_type, $ret ]), $func_type, $free_typevars);
             $ret
@@ -183,18 +187,42 @@ sub algorithm_w {
             algorithm_w($expr->{"val"}->[2], $env_current, $free_typevars)
         },
         "letrec" =>
+        #sub {
+        #    my ( $env_current, $free_typevars_current ) = 
+        #       ( { %$env }, [ @$free_typevars ] );
+        #    my $defn_vartype = new_typevar();
+        #    $env_current->{$expr->{"val"}->[0]} = $defn_vartype;
+        #    push @$free_typevars_current, $defn_vartype;
+        #    my $defn_type = algorithm_w($expr->{"val"}->[1], $env_current, $free_typevars_current);
+        #    # XXX Remove $defn_vartype from foralls. Now it's higher-order polymorphism.
+        #    my($rmidx)= grep { $free_typevars_current->[$_] eq $defn_vartype } 0..$#{$free_typevars_current};
+        #    splice @$free_typevars_current, $rmidx, 1;
+        #    unify($defn_vartype, $defn_type, $free_typevars_current);
+        #    algorithm_w($expr->{"val"}->[2], $env_current, $free_typevars_current)
+        #}
+        # Here we are able to handle mutral recursion. 
+        # Or we should say that self-recursion is trivial. I keep the old code for reference on the algorithm.
         sub {
             my ( $env_current, $free_typevars_current ) = 
                ( { %$env }, [ @$free_typevars ] );
-            my $defn_vartype = new_typevar();
-            $env_current->{$expr->{"val"}->[0]} = $defn_vartype;
-            push @$free_typevars_current, $defn_vartype;
-            my $defn_type = algorithm_w($expr->{"val"}->[1], $env_current, $free_typevars_current);
-            # XXX Remove $defn_vartype from foralls. Now it's higher-order polymorphism.
-            my($rmidx)= grep { $free_typevars_current->[$_] eq $defn_vartype } 0..$#{$free_typevars_current};
-            splice @$free_typevars_current, $rmidx, 1;
-            unify($defn_vartype, $defn_type, $free_typevars_current);
-            algorithm_w($expr->{"val"}->[2], $env_current, $free_typevars_current)
+            my @lhslist = ();
+            my $defns = $expr->{"val"}->[0];
+            for my $elt (@$defns) {
+                my $defn_vartype = new_typevar();
+                push @lhslist, $defn_vartype;
+                $env_current->{$elt->[0]} = $defn_vartype;
+                push @$free_typevars_current, $defn_vartype;
+            }
+            for my $elt (@$defns) {
+                my $defn_vartype = $env_current->{$elt->[0]};
+                my $defn_type = algorithm_w($elt->[1], $env_current, $free_typevars_current);
+                unify($defn_vartype, $defn_type, $free_typevars_current);
+            }
+            for my $lhsvar (@lhslist) {
+                my($rmidx)= grep { $free_typevars_current->[$_] eq $lhsvar } 0..$#{$free_typevars_current};
+                splice @$free_typevars_current, $rmidx, 1;
+            }
+            algorithm_w($expr->{"val"}->[1], $env_current, $free_typevars_current)
         }
     );
     $switches{$expr->{"kind"}}->()
@@ -207,6 +235,7 @@ my $pair_type = new_typeappl('*', [ $type_var_pairelt1, $type_var_pairelt2 ]);
 $langenv->{"pair"} = new_typeappl("->", [ $type_var_pairelt1, new_typeappl("->", [ $type_var_pairelt2, $pair_type ]) ] );
 $langenv->{"prea"} = new_typeappl("Int", []);
 $langenv->{"preb"} = new_typeappl("Bool", []);
+$langenv->{"add"} = new_typeappl("->", [ new_typeappl("Int", []), new_typeappl("->", [ new_typeappl("Int", []), new_typeappl("Int", []) ]) ]);
 
 while (my ($k, $v) = each %$langenv) {
     print "$k :: ".type_to_string($v)."\n";
