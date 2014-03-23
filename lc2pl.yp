@@ -1,0 +1,22 @@
+%token CONST
+%token VAR
+%token IMP
+%token FUN
+%token LPAREN
+%token RPAREN
+%token APP
+
+%nonassoc FUN
+%nonassoc VAR CONST LPAREN
+%left APP
+
+%%
+
+expr: CONST { my $litval = $_[1]; sub { $litval } }
+    | VAR { my $varname = $_[1]; sub { my %args_ = @_; $args_{$varname} } }
+    | FUN VAR IMP expr { my ($param, $term) = ($_[2], $_[4]); sub { my %args = @_; sub { $args{$param} = shift; $term->(%args) } } }
+    | LPAREN expr RPAREN { $_[2] }
+    | expr expr %prec APP { my ($op, $arg) = ($_[1], $_[2]); sub { my %args_ = @_; $op->(%args_)->($arg->(%args_)) } }
+;
+
+%%
