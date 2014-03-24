@@ -162,10 +162,16 @@ sub cpstrans {
             my %args = @_; 
             my ($cont, $cont2, $cont3, $contarg) = (gensym("c"), gensym("m"), gensym("n"), gensym("a"));
             abst_any($cont, appl_any(cpstrans($args{op}), abst_any($cont2, appl_any(cpstrans($args{arg}), abst_any($cont3, appl_any(appl_any(var_any($cont2), var_any($cont3)), abst_any($contarg, appl_any(var_any($cont), var_any($contarg)))))))))
+        },
+        "appl (op arg _dup)" => 
+        sub {
+            my %args = @_; 
+            my ($cont, $cont2, $cont3, $contarg) = (gensym("c"), gensym("m"), gensym("n"), gensym("a"));
+            abst_any($cont, appl_any(cpstrans($args{op}), abst_any($cont2, appl_any(cpstrans($args{arg}), abst_any($cont3, appl_any(appl_any(var_any($cont2), var_any($cont3)), abst_any($contarg, appl_any(var_any($cont), var_any($contarg)))))))))
         }
     )->(@_)
 }
 
-my $cpsform = cpstrans($expr);
+my $cpsform = cpstrans(do_rewrite($expr, {}));
 print ast_to_string($cpsform), "\n";
 print ast_to_string(do_rewrite($cpsform, {})), "\n";
