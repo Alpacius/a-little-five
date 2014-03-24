@@ -172,6 +172,7 @@ sub cpstrans {
     )->(@_)
 }
 
-my $cpsform = cpstrans(do_rewrite($expr, {}));
+#my $cpsform = cpstrans(do_rewrite($expr, {}));
+my $cpsform = cpstrans($expr);
 print ast_to_string($cpsform), "\n";
 print ast_to_string(do_rewrite($cpsform, {})), "\n";
